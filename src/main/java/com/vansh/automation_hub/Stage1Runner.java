@@ -5,7 +5,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 // CommandLineRunner = app start hone ke turant baad ek baar chalta hai
-@Component
+//@Component
 public class Stage1Runner implements CommandLineRunner {
 
     private final TelegramService telegramService;
