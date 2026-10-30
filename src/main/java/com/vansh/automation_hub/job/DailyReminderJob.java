@@ -1,36 +1,35 @@
 package com.vansh.automation_hub.job;
 
+import com.vansh.automation_hub.model.Job;
+import com.vansh.automation_hub.repository.JobRepository;
 import com.vansh.automation_hub.service.TelegramService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Component
 public class DailyReminderJob {
 
     private final TelegramService telegramService;
+    private final JobRepository jobRepository;
 
-    // Spring TelegramService khud inject kar deta hai (jaise Stage 1 mein)
-    public DailyReminderJob(TelegramService telegramService) {
+    // Spring dono cheezein khud inject kar deta hai
+    public DailyReminderJob(TelegramService telegramService, JobRepository jobRepository) {
         this.telegramService = telegramService;
+        this.jobRepository = jobRepository;
     }
 
-    // Trigger = time. Cron value application.properties se aati hai.
-    // zone = Indian time, taaki server kahin bhi ho, time hamara hi rahe.
-    // Scheduled method void hona chahiye aur uska koi parameter nahi hota.
+    // Time abhi bhi properties se aata hai
     @Scheduled(cron = "${reminder.cron}", zone = "Asia/Kolkata")
-    public void sendReminder() {
-        // Abhi ka Indian time, padhne layak format mein
-        String now = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"))
-                .format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a"));
+    public void runActiveJobs() {
+        // DB se saare active jobs lao
+        List<Job> activeJobs = jobRepository.findByActiveTrue();
 
-        // Action = Telegram message (wahi Stage 1 wala service)
-        telegramService.sendMessage(
-                "Reminder from Automation Hub ⏰\n"
-                        + "Time: " + now + "\n"
-                        + "Aaj ka goal: ek project commit karna 🚀");
+        // Har job ka message bhejo
+        for (Job job : activeJobs) {
+            System.out.println("Running job: " + job.getName());
+            telegramService.sendMessage(job.getMessage());
+        }
     }
 }
