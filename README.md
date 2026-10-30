@@ -14,6 +14,9 @@ retries, multiple channels).
 - `CommandLineRunner` to run logic at application startup
 - Constructor-based dependency injection with `@Service` and `@Component`
 - Keeping secrets out of source code
+- Scheduling with `@Scheduled` and `@EnableScheduling`
+- Cron expressions (6 fields in Spring) and timezone handling (`Asia/Kolkata`)
+- Externalizing the schedule in `application.properties`
 
 ## What I Learned
 - How a bot token and chat id identify the sender and the receiver
