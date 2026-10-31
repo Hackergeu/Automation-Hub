@@ -21,7 +21,8 @@ public class DataSeeder implements CommandLineRunner {
             jobRepository.save(new Job(
                     "Morning goal reminder",
                     "Good morning Vansh! Aaj ka goal: ek project commit karna 🚀",
-                    "TELEGRAM"));
+                    "TELEGRAM",
+                    "0 0 8 * * *"));   // roz subah 8 baje
             System.out.println("Sample job DB mein save ho gaya.");
         }
     }

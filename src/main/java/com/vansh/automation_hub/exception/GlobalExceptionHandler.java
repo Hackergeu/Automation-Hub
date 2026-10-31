@@ -29,4 +29,12 @@ public class GlobalExceptionHandler {
                 .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
         return ResponseEntity.badRequest().body(errors);
     }
+
+    // Galat cron -> 400
+    @ExceptionHandler(InvalidCronException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidCron(InvalidCronException ex) {
+        return ResponseEntity
+                .badRequest()
+                .body(Map.of("cronExpression", ex.getMessage()));
+    }
 }

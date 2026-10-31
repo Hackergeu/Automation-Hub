@@ -2,63 +2,87 @@ package com.vansh.automation_hub.service;
 
 import com.vansh.automation_hub.dto.JobRequest;
 import com.vansh.automation_hub.dto.JobResponse;
+import com.vansh.automation_hub.exception.InvalidCronException;
 import com.vansh.automation_hub.exception.JobNotFoundException;
 import com.vansh.automation_hub.model.Job;
 import com.vansh.automation_hub.repository.JobRepository;
+import com.vansh.automation_hub.scheduler.JobSchedulerService;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+
+
 
 @Service
 public class JobService {
 
     private final JobRepository jobRepository;
+    private final JobSchedulerService jobSchedulerService;
 
-    public JobService(JobRepository jobRepository) {
+    public JobService(JobRepository jobRepository, JobSchedulerService jobSchedulerService) {
         this.jobRepository = jobRepository;
+        this.jobSchedulerService = jobSchedulerService;
     }
 
-    // Naya job banao
     public JobResponse create(JobRequest request) {
-        Job job = new Job(request.name(), request.message(), request.channel());
-        return JobResponse.from(jobRepository.save(job));
+        validateCron(request.cronExpression());
+
+        Job job = new Job(request.name(), request.message(),
+                request.channel(), request.cronExpression());
+        Job saved = jobRepository.save(job);
+
+        // DB mein save hone ke BAAD alarm lagao (id tabhi milti hai)
+        jobSchedulerService.schedule(saved);
+        return JobResponse.from(saved);
     }
 
-    // Saare jobs
     public List<JobResponse> getAll() {
-        return jobRepository.findAll().stream()
-                .map(JobResponse::from)
-                .toList();
+        return jobRepository.findAll().stream().map(JobResponse::from).toList();
     }
 
-    // Ek job
     public JobResponse getById(Long id) {
         return JobResponse.from(findOrThrow(id));
     }
 
-    // Job edit karo (name, message, channel badal sakte hain)
     public JobResponse update(Long id, JobRequest request) {
+        validateCron(request.cronExpression());
+
         Job job = findOrThrow(id);
         job.setName(request.name());
         job.setMessage(request.message());
         job.setChannel(request.channel());
-        return JobResponse.from(jobRepository.save(job));
+        job.setCronExpression(request.cronExpression());
+        Job saved = jobRepository.save(job);
+
+        // Cron badla ho sakta hai, isliye alarm dobara lagao (purana khud hat jaata hai)
+        jobSchedulerService.schedule(saved);
+        return JobResponse.from(saved);
     }
 
-    // Job delete karo
     public void delete(Long id) {
         Job job = findOrThrow(id);
+        // Pehle alarm hatao, warna deleted job ka alarm bajta rahega
+        jobSchedulerService.cancel(id);
         jobRepository.delete(job);
     }
 
-    // Pause (false) ya resume (true). Row delete kiye bina job band/chalu hota hai
+    // Pause: active=false (schedule() alarm hata deta hai). Resume: active=true (alarm lagta hai)
     public JobResponse setActive(Long id, boolean active) {
         Job job = findOrThrow(id);
         job.setActive(active);
-        return JobResponse.from(jobRepository.save(job));
+        Job saved = jobRepository.save(job);
+        jobSchedulerService.schedule(saved);
+        return JobResponse.from(saved);
     }
 
-    // Repeat hone wala code ek jagah: id se job lao, nahi mila toh 404 wala exception
+    // Galat cron app ko todega nahi, bas 400 error milega
+    private void validateCron(String cron) {
+        if (!CronExpression.isValidExpression(cron)) {
+            throw new InvalidCronException(cron);
+        }
+    }
+
     private Job findOrThrow(Long id) {
         return jobRepository.findById(id)
                 .orElseThrow(() -> new JobNotFoundException(id));

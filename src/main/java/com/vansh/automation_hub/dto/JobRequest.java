@@ -14,9 +14,13 @@ public record JobRequest(
         @Size(max = 1000, message = "message must be at most 1000 characters")
         String message,
 
-        // Abhi sirf TELEGRAM supported hai. Stage 7 mein aur channels aayenge
         @NotBlank(message = "channel is required")
         @Pattern(regexp = "TELEGRAM", message = "channel must be TELEGRAM")
-        String channel
+        String channel,
+
+        // NAYA: cron ki sahi format ki jaanch service mein hoti hai (CronExpression.isValid)
+        @NotBlank(message = "cronExpression is required")
+        @Size(max = 100, message = "cronExpression is too long")
+        String cronExpression
 ) {
 }
