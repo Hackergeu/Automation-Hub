@@ -2,9 +2,8 @@
 
 ## Overview
 A Spring Boot application that automates sending messages to Telegram on a schedule.
-Messages are stored as jobs in a MySQL database, so the content can be changed
-without touching the code. The scheduler reads the active jobs from the database and
-sends each one through a Telegram bot at the configured time (IST).
+Each job has its own cron expression, stored in MySQL, and is scheduled at runtime
+without restarting the application.
 
 This is being built in stages towards a full automation platform with a REST API,
 dynamic scheduling, retries, execution logs, multiple channels and deployment on AWS.
@@ -12,12 +11,15 @@ dynamic scheduling, retries, execution logs, multiple channels and deployment on
 Jobs can be managed at runtime through a REST API (create, read, update, delete,
 pause and resume), with request validation and clean JSON error responses.
 
+Creating, updating, pausing, resuming or deleting a job through the API immediately
+updates its schedule.
+
 ## Concepts Covered
 - Trigger -> Action model of automation
 - Telegram Bot API (`sendMessage`, bot token, chat id)
 - Calling external REST APIs with `RestTemplate`
 - Externalized configuration with environment variables and `@Value`
-- Scheduling with `@Scheduled` and `@EnableScheduling`
+- Scheduling basics with `@Scheduled`
 - Cron expressions (6 fields in Spring) and timezone handling (`Asia/Kolkata`)
 - JPA entities, `JpaRepository` and derived queries (`findByActiveTrue`)
 - Hibernate schema generation (`ddl-auto=update`)
@@ -30,6 +32,11 @@ pause and resume), with request validation and clean JSON error responses.
 - Bean Validation (`@Valid`, `@NotBlank`, `@Size`, `@Pattern`)
 - Centralized error handling with `@RestControllerAdvice`
 - Testing APIs with Postman
+- Dynamic scheduling with `TaskScheduler`, `CronTrigger` and `ThreadPoolTaskScheduler`
+- Tracking scheduled tasks with `ScheduledFuture` to cancel and reschedule them
+- Thread-safe state with `ConcurrentHashMap`
+- Rebuilding schedules from the database on startup with `ApplicationReadyEvent`
+- Cron validation with `CronExpression` and a custom exception (HTTP 400)
 
 ## What I Learned
 - How a bot token and chat id identify the sender and the receiver
@@ -40,6 +47,9 @@ pause and resume), with request validation and clean JSON error responses.
 - Why entities are not exposed directly and DTOs are used instead
 - How validation and a global exception handler produce clear error messages
 - How pause/resume (an `active` flag) is safer than deleting a job
+- Why `@Scheduled` cannot change at runtime and how `TaskScheduler` solves it
+- Why a job is re-read from the database when it fires, so edits apply immediately
+- How to keep in-memory schedules consistent with the database
 
 ## How to Run
 1. Create a bot with @BotFather on Telegram and copy the bot token.
@@ -47,17 +57,19 @@ pause and resume), with request validation and clean JSON error responses.
 3. Create a MySQL database named `automation_hub`.
 4. Set these environment variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
    `DB_USERNAME`, `DB_PASSWORD`.
-5. Optionally change `reminder.cron` in `application.properties` (default: every day at 8 AM).
-6. Run `AutomationHubApplication` (Java 17+ and Maven required).
-7. A sample job is inserted on first start. Update its `message` in the `jobs` table
+5. Run `AutomationHubApplication` (Java 17+ and Maven required).
+6. A sample job is inserted on first start. Update its `message` in the `jobs` table
    and the next run will send the new text.
-8. Manage jobs through the API at `http://localhost:8080/api/jobs`:
+7. Manage jobs through the API at `http://localhost:8080/api/jobs`:
    `POST /api/jobs`, `GET /api/jobs`, `GET /api/jobs/{id}`, `PUT /api/jobs/{id}`,
    `DELETE /api/jobs/{id}`, `PATCH /api/jobs/{id}/pause`, `PATCH /api/jobs/{id}/resume`.
    Note: the API has no authentication yet, so do not expose it publicly.
+8. Create a job with its own schedule, for example:
+  `POST /api/jobs` with
+  `{"name": "Study reminder", "message": "DSA time!", "channel": "TELEGRAM", "cronExpression": "0 0 21 * * *"}`
+   The cron format has 6 fields: second minute hour day month weekday (IST).
 
 ## Possible Improvements
-- Per-job cron expressions with dynamic scheduling (Stage 5)
 - Retries and an execution log for failed messages (Stage 6)
 - More channels such as Email and Slack (Stage 7)
 - Authentication and deployment on AWS (Stage 8)
