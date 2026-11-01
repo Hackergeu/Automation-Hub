@@ -14,6 +14,10 @@ pause and resume), with request validation and clean JSON error responses.
 Creating, updating, pausing, resuming or deleting a job through the API immediately
 updates its schedule.
 
+Each run is retried automatically on transient failures (network issues, rate limits,
+server errors) using exponential backoff, and every run is recorded in an execution log
+with its status, number of attempts and error reason.
+
 ## Concepts Covered
 - Trigger -> Action model of automation
 - Telegram Bot API (`sendMessage`, bot token, chat id)
@@ -37,6 +41,13 @@ updates its schedule.
 - Thread-safe state with `ConcurrentHashMap`
 - Rebuilding schedules from the database on startup with `ApplicationReadyEvent`
 - Cron validation with `CronExpression` and a custom exception (HTTP 400)
+- Transient vs permanent failures, and retrying only the transient ones
+- Exponential backoff with a configurable retry limit
+- HTTP timeouts (connect and read) to avoid hanging threads
+- Custom exceptions that carry a `retryable` flag
+- Execution log entity with an enum status (`EnumType.STRING`)
+- At-least-once delivery and why retries can cause duplicates
+- Derived queries (`findTop50ByJobIdOrderByStartedAtDesc`) and `@Transactional` deletes
 
 ## What I Learned
 - How a bot token and chat id identify the sender and the receiver
@@ -50,6 +61,9 @@ updates its schedule.
 - Why `@Scheduled` cannot change at runtime and how `TaskScheduler` solves it
 - Why a job is re-read from the database when it fires, so edits apply immediately
 - How to keep in-memory schedules consistent with the database
+- Why swallowing exceptions is dangerous, and why errors should be reported, not hidden
+- Why a wrong token should never be retried but a network timeout should
+- How idempotency trade-offs differ between a reminder bot and a payment system
 
 ## How to Run
 1. Create a bot with @BotFather on Telegram and copy the bot token.
@@ -67,9 +81,12 @@ updates its schedule.
 8. Create a job with its own schedule, for example:
   `POST /api/jobs` with
   `{"name": "Study reminder", "message": "DSA time!", "channel": "TELEGRAM", "cronExpression": "0 0 21 * * *"}`
-   The cron format has 6 fields: second minute hour day month weekday (IST).
+   The cron format has 6 fields: second minute hour day month weekday (IST)
+9. Check the history of a job with `GET /api/jobs/{id}/logs` (latest 50 runs).
+   Retry behaviour can be tuned with `retry.max-attempts` and `retry.initial-delay-ms`.
 
 ## Possible Improvements
-- Retries and an execution log for failed messages (Stage 6)
 - More channels such as Email and Slack (Stage 7)
 - Authentication and deployment on AWS (Stage 8)
+- Schedule retries instead of sleeping in the scheduler thread, so threads are never blocked
+- Retention policy to delete old execution logs
