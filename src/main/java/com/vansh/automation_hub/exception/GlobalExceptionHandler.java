@@ -37,4 +37,12 @@ public class GlobalExceptionHandler {
                 .badRequest()
                 .body(Map.of("cronExpression", ex.getMessage()));
     }
+
+    // Galat ya unavailable channel/target -> 400, aur batao kaun si field galat hai
+    @ExceptionHandler(InvalidChannelException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidChannel(InvalidChannelException ex) {
+        return ResponseEntity
+                .badRequest()
+                .body(Map.of(ex.getField(), ex.getMessage()));
+    }
 }

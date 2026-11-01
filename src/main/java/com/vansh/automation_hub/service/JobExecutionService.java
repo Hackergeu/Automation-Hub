@@ -1,6 +1,8 @@
 package com.vansh.automation_hub.service;
 
-import com.vansh.automation_hub.exception.TelegramSendException;
+import com.vansh.automation_hub.channel.ChannelRegistry;
+import com.vansh.automation_hub.channel.MessageChannel;
+import com.vansh.automation_hub.exception.ChannelSendException;
 import com.vansh.automation_hub.model.ExecutionLog;
 import com.vansh.automation_hub.model.ExecutionStatus;
 import com.vansh.automation_hub.model.Job;
@@ -10,23 +12,21 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 
-// Ek job ko chalata hai: retry ke saath bhejta hai, aur nateeja logbook mein likhta hai
 @Service
 public class JobExecutionService {
 
-    // Properties se aate hain. ":3" aur ":1000" default hain agar property na mile
     @Value("${retry.max-attempts:3}")
     private int maxAttempts;
 
     @Value("${retry.initial-delay-ms:1000}")
     private long initialDelayMs;
 
-    private final TelegramService telegramService;
+    private final ChannelRegistry channelRegistry;
     private final ExecutionLogRepository executionLogRepository;
 
-    public JobExecutionService(TelegramService telegramService,
+    public JobExecutionService(ChannelRegistry channelRegistry,
                                ExecutionLogRepository executionLogRepository) {
-        this.telegramService = telegramService;
+        this.channelRegistry = channelRegistry;
         this.executionLogRepository = executionLogRepository;
     }
 
@@ -40,22 +40,25 @@ public class JobExecutionService {
         while (attempts < maxAttempts) {
             attempts++;
             try {
-                telegramService.sendMessage(job.getMessage());
+                // Dispatcher se job ke channel ka delivery boy lo, aur message bhejo.
+                // Yahan koi "if TELEGRAM... else if DISCORD..." nahi hai, yahi Strategy pattern ka faayda hai
+                MessageChannel channel = channelRegistry.get(job.getChannel());
+                channel.send(job.getTarget(), job.getMessage());
                 success = true;
                 error = null;
-                break; // Ho gaya, aur retry nahi chahiye
+                break;
 
-            } catch (TelegramSendException ex) {
+            } catch (ChannelSendException ex) {
                 error = ex.getMessage();
-                System.out.println("Job " + job.getId() + " attempt " + attempts
-                        + "/" + maxAttempts + " failed: " + error);
+                System.out.println("Job " + job.getId() + " [" + job.getChannel() + "] attempt "
+                        + attempts + "/" + maxAttempts + " failed: " + error);
 
-                // Permanent error: retry bekaar hai, seedha ruk jao
+                // Permanent error: retry bekaar hai
                 if (!ex.isRetryable()) {
                     break;
                 }
 
-                // Retry bacha hai toh wait karo, aur agli baar wait double karo (backoff)
+                // Retry bacha hai toh wait karo, aur agli baar wait double (backoff)
                 if (attempts < maxAttempts) {
                     if (!pause(delay)) {
                         error = "Interrupted while waiting to retry";
@@ -66,7 +69,6 @@ public class JobExecutionService {
             }
         }
 
-        // Nateeja logbook mein likho
         ExecutionLog log = new ExecutionLog(
                 job.getId(),
                 job.getName(),
@@ -81,13 +83,11 @@ public class JobExecutionService {
                 + log.getStatus() + " after " + attempts + " attempt(s)");
     }
 
-    // Thread ko kuch der sula do. false = beech mein interrupt hua (app band ho rahi hai)
     private boolean pause(long millis) {
         try {
             Thread.sleep(millis);
             return true;
         } catch (InterruptedException e) {
-            // Interrupt ka flag wapas set karna achhi practice hai
             Thread.currentThread().interrupt();
             return false;
         }

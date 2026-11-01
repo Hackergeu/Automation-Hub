@@ -9,6 +9,7 @@ public record JobResponse(
         String name,
         String message,
         String channel,
+        String target,
         String cronExpression,
         boolean active,
         LocalDateTime createdAt
@@ -20,6 +21,7 @@ public record JobResponse(
                 job.getName(),
                 job.getMessage(),
                 job.getChannel(),
+                job.getTarget(),
                 job.getCronExpression(),
                 job.isActive(),
                 job.getCreatedAt());

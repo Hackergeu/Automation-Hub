@@ -17,11 +17,14 @@ public class Job {
     @Column(nullable = false, length = 1000)
     private String message;
 
+    // TELEGRAM, DISCORD ya EMAIL
     @Column(nullable = false)
     private String channel;
 
-    // NAYA: is job ka apna schedule (Spring cron, 6 fields).
-    // Nullable rakha hai taaki purani rows (jinme cron nahi tha) table update par na tootein.
+    // NAYA: channel ke hisaab se "kisko". Email ke liye address; baaki channels ke liye khali (null)
+    @Column(length = 200)
+    private String target;
+
     private String cronExpression;
 
     @Column(nullable = false)
@@ -32,12 +35,17 @@ public class Job {
     public Job() {
     }
 
-    // Constructor mein ab cron bhi aata hai
+    // Purana 4-argument constructor (DataSeeder isi ko use karta hai), target null rahega
     public Job(String name, String message, String channel, String cronExpression) {
+        this(name, message, channel, cronExpression, null);
+    }
+
+    public Job(String name, String message, String channel, String cronExpression, String target) {
         this.name = name;
         this.message = message;
         this.channel = channel;
         this.cronExpression = cronExpression;
+        this.target = target;
     }
 
     @PrePersist
@@ -52,6 +60,8 @@ public class Job {
     public void setMessage(String message) { this.message = message; }
     public String getChannel() { return channel; }
     public void setChannel(String channel) { this.channel = channel; }
+    public String getTarget() { return target; }
+    public void setTarget(String target) { this.target = target; }
     public String getCronExpression() { return cronExpression; }
     public void setCronExpression(String cronExpression) { this.cronExpression = cronExpression; }
     public boolean isActive() { return active; }
