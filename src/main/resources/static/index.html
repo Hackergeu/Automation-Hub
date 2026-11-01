@@ -85,11 +85,106 @@
         <section class="section-head">
             <h2>Your jobs</h2>
             <span id="jobs-count" class="count-pill"></span>
+            <button id="new-job-btn" class="btn btn-primary btn-sm push-right" type="button">+ New job</button>
         </section>
 
         <section id="jobs" class="jobs-grid"></section>
     </div>
 </div>
+
+
+<!-- ============ NEW / EDIT JOB FORM ============ -->
+<dialog id="job-dialog" class="dialog dialog--wide">
+    <form id="job-form" novalidate>
+        <div class="dialog-head">
+            <h3 id="job-dialog-title">New job</h3>
+            <button type="button" id="job-close" class="icon-btn" aria-label="Close">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+        </div>
+
+        <label class="field">
+            <span>Name</span>
+            <input id="job-name" type="text" maxlength="100" placeholder="Morning goal reminder">
+            <small class="field-error" data-error-for="name"></small>
+        </label>
+
+        <label class="field">
+            <span>Message</span>
+            <textarea id="job-message" rows="3" maxlength="1000" placeholder="What should be sent?"></textarea>
+            <small class="field-hint"><span id="message-count">0</span>/1000</small>
+            <small class="field-error" data-error-for="message"></small>
+        </label>
+
+        <div class="field-row">
+            <label class="field">
+                <span>Channel</span>
+                <select id="job-channel"></select>
+                <small class="field-error" data-error-for="channel"></small>
+            </label>
+
+            <!-- Sirf EMAIL channel chunne par dikhta hai -->
+            <label class="field hidden" id="target-field">
+                <span>Send to (email)</span>
+                <input id="job-target" type="email" placeholder="you@example.com">
+                <small class="field-error" data-error-for="target"></small>
+            </label>
+        </div>
+
+        <fieldset class="schedule">
+            <legend>Schedule (IST)</legend>
+
+            <div class="field-row">
+                <label class="field">
+                    <span>Repeat</span>
+                    <select id="schedule-mode">
+                        <option value="daily">Every day</option>
+                        <option value="weekdays">Weekdays (Mon to Fri)</option>
+                        <option value="days">Specific days</option>
+                        <option value="minutes">Every N minutes</option>
+                        <option value="hours">Every N hours</option>
+                        <option value="custom">Custom cron</option>
+                    </select>
+                </label>
+
+                <label class="field" id="time-field">
+                    <span>At</span>
+                    <input id="schedule-time" type="time" value="08:00">
+                </label>
+
+                <label class="field hidden" id="interval-field">
+                    <span id="interval-label">Every</span>
+                    <input id="schedule-interval" type="number" min="1" max="59" value="15">
+                </label>
+            </div>
+
+            <div id="days-field" class="days hidden" role="group" aria-label="Days of the week"></div>
+
+            <label class="field hidden" id="custom-field">
+                <span>Cron expression</span>
+                <input id="schedule-custom" type="text" placeholder="0 0 8 * * *" spellcheck="false">
+            </label>
+
+            <div class="schedule-preview">
+                <span id="schedule-text"></span>
+                <code id="schedule-cron"></code>
+            </div>
+            <small class="field-error" data-error-for="cronExpression"></small>
+        </fieldset>
+
+        <p id="job-form-error" class="form-error hidden" role="alert"></p>
+
+        <div class="dialog-actions">
+            <button type="button" id="job-cancel" class="btn btn-ghost">Cancel</button>
+            <button id="job-save" class="btn btn-primary" type="submit">
+                <span class="btn-label">Create job</span>
+                <span class="spinner" aria-hidden="true"></span>
+            </button>
+        </div>
+    </form>
+</dialog>
+
+
 
 <!-- ============ DELETE CONFIRM (native <dialog>) ============ -->
 <dialog id="confirm-dialog" class="dialog">

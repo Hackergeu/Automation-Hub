@@ -35,4 +35,13 @@ public class ChannelRegistry {
         MessageChannel channel = channels.get(name);
         return channel != null && channel.isAvailable();
     }
+
+    // UI ke liye: sirf wo channels jo is server pe configured hain (jaise webhook URL set hai)
+    public List<String> availableChannelNames() {
+        return channels.values().stream()
+                .filter(MessageChannel::isAvailable)
+                .map(MessageChannel::name)
+                .sorted()
+                .toList();
+    }
 }
