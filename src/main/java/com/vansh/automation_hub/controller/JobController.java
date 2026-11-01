@@ -6,6 +6,7 @@ import com.vansh.automation_hub.service.JobService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import com.vansh.automation_hub.dto.ExecutionLogResponse;
 
 import java.util.List;
 
@@ -65,5 +66,11 @@ public class JobController {
     @PatchMapping("/{id}/resume")
     public JobResponse resume(@PathVariable Long id) {
         return jobService.setActive(id, true);
+    }
+
+    // GET /api/jobs/5/logs -> us job ke latest 50 runs (naya pehle)
+    @GetMapping("/{id}/logs")
+    public List<ExecutionLogResponse> getLogs(@PathVariable Long id) {
+        return jobService.getLogs(id);
     }
 }

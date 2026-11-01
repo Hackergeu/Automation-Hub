@@ -1,28 +1,33 @@
 package com.vansh.automation_hub.service;
 
+import com.vansh.automation_hub.dto.ExecutionLogResponse;
 import com.vansh.automation_hub.dto.JobRequest;
 import com.vansh.automation_hub.dto.JobResponse;
 import com.vansh.automation_hub.exception.InvalidCronException;
 import com.vansh.automation_hub.exception.JobNotFoundException;
 import com.vansh.automation_hub.model.Job;
+import com.vansh.automation_hub.repository.ExecutionLogRepository;
 import com.vansh.automation_hub.repository.JobRepository;
 import com.vansh.automation_hub.scheduler.JobSchedulerService;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-
-
 
 @Service
 public class JobService {
 
     private final JobRepository jobRepository;
     private final JobSchedulerService jobSchedulerService;
+    private final ExecutionLogRepository executionLogRepository;
 
-    public JobService(JobRepository jobRepository, JobSchedulerService jobSchedulerService) {
+    public JobService(JobRepository jobRepository,
+                      JobSchedulerService jobSchedulerService,
+                      ExecutionLogRepository executionLogRepository) {
         this.jobRepository = jobRepository;
         this.jobSchedulerService = jobSchedulerService;
+        this.executionLogRepository = executionLogRepository;
     }
 
     public JobResponse create(JobRequest request) {
@@ -32,7 +37,6 @@ public class JobService {
                 request.channel(), request.cronExpression());
         Job saved = jobRepository.save(job);
 
-        // DB mein save hone ke BAAD alarm lagao (id tabhi milti hai)
         jobSchedulerService.schedule(saved);
         return JobResponse.from(saved);
     }
@@ -55,19 +59,20 @@ public class JobService {
         job.setCronExpression(request.cronExpression());
         Job saved = jobRepository.save(job);
 
-        // Cron badla ho sakta hai, isliye alarm dobara lagao (purana khud hat jaata hai)
         jobSchedulerService.schedule(saved);
         return JobResponse.from(saved);
     }
 
+    // @Transactional: deleteByJobId jaisi derived delete query ko transaction chahiye hoti hai
+    @Transactional
     public void delete(Long id) {
         Job job = findOrThrow(id);
-        // Pehle alarm hatao, warna deleted job ka alarm bajta rahega
         jobSchedulerService.cancel(id);
+        // Job ke saath uske purane logs bhi hata do, warna anaath rows bachi rahengi
+        executionLogRepository.deleteByJobId(id);
         jobRepository.delete(job);
     }
 
-    // Pause: active=false (schedule() alarm hata deta hai). Resume: active=true (alarm lagta hai)
     public JobResponse setActive(Long id, boolean active) {
         Job job = findOrThrow(id);
         job.setActive(active);
@@ -76,7 +81,14 @@ public class JobService {
         return JobResponse.from(saved);
     }
 
-    // Galat cron app ko todega nahi, bas 400 error milega
+    // NAYA: ek job ke latest 50 runs. Pehle check karo ki job exist karta hai (nahi toh 404)
+    public List<ExecutionLogResponse> getLogs(Long id) {
+        findOrThrow(id);
+        return executionLogRepository.findTop50ByJobIdOrderByStartedAtDesc(id).stream()
+                .map(ExecutionLogResponse::from)
+                .toList();
+    }
+
     private void validateCron(String cron) {
         if (!CronExpression.isValidExpression(cron)) {
             throw new InvalidCronException(cron);

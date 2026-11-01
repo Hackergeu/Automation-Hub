@@ -1,43 +1,64 @@
 package com.vansh.automation_hub.service;
 
+import com.vansh.automation_hub.exception.TelegramSendException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.Map;
 
 @Service
 public class TelegramService {
 
-    // application.properties se token aata hai (jo environment variable se bhara gaya)
     @Value("${telegram.bot-token}")
     private String botToken;
 
-    // Ye hamara "ghar ka address" hai, yaani message kis chat mein jayega
     @Value("${telegram.chat-id}")
     private String chatId;
 
-    // RestTemplate = Spring ka tool jo doosri websites/APIs ko HTTP request bhejta hai
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
+    public TelegramService() {
+        // Timeouts: bina inke, net atakne par request hamesha intezaar karti reh sakti hai
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(5));   // connection banane ka max time
+        factory.setReadTimeout(Duration.ofSeconds(10));     // jawab aane ka max time
+        this.restTemplate = new RestTemplate(factory);
+    }
+
+    // Success par kuch nahi lautata. Fail hone par TelegramSendException phenkta hai.
     public void sendMessage(String text) {
-        // Telegram ka sendMessage endpoint, token URL ka hissa hota hai
         String url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
 
-        // Request body: kis chat mein, aur kya text bhejna hai
         Map<String, String> body = Map.of(
                 "chat_id", chatId,
                 "text", text
         );
 
         try {
-            // POST request bhejo; Telegram JSON mein jawab deta hai
-            String response = restTemplate.postForObject(url, body, String.class);
-            System.out.println("Telegram ka jawab: " + response);
+            restTemplate.postForObject(url, body, String.class);
+
+        } catch (HttpStatusCodeException e) {
+            // Telegram ne jawab diya par error code ke saath (4xx ya 5xx)
+            int code = e.getStatusCode().value();
+            // 429 (rate limit) aur 5xx (server problem) thodi der baad theek ho sakte hain.
+            // Baaki 4xx (galat token, galat chat id) retry se theek nahi honge.
+            boolean retryable = code == 429 || code >= 500;
+            throw new TelegramSendException("Telegram returned HTTP " + code, retryable);
+
+        } catch (ResourceAccessException e) {
+            // Internet nahi, DNS fail, ya timeout. Transient hai, retry karo.
+            // Dhyan: e.getMessage() mein URL (aur token) hota hai, isliye use message mein nahi daalte
+            throw new TelegramSendException("Network problem or timeout while contacting Telegram", true);
+
         } catch (RestClientException e) {
-            // Dhyan: poora error print nahi kar rahe, kyunki usme URL (aur token) aa sakta hai
-            System.out.println("Message nahi gaya. Error type: " + e.getClass().getSimpleName());
+            // Koi aur ajeeb error: bina soche retry mat karo
+            throw new TelegramSendException("Unexpected error: " + e.getClass().getSimpleName(), false);
         }
     }
 }
