@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Automation Hub</title>
+
+    <!-- Tab ka icon (chhota bijli ka nishaan), bina alag file ke -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%236366f1' d='M13 2 4 14h6l-1 8 9-12h-6z'/%3E%3C/svg%3E">
+
+    <!-- Inter font (Google Fonts). Na mile toh system font use hoga -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<!-- Peeche ke halke rangeen gradient blobs (sirf sajawat) -->
+<div class="bg" aria-hidden="true"></div>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<main id="login-view" class="login">
+    <section class="login-card">
+        <div class="brand brand--large">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+        </span>
+            <span class="brand-name">Automation Hub</span>
+        </div>
+
+        <h1 class="login-title">Welcome back</h1>
+        <p class="muted">Sign in to manage your scheduled messages.</p>
+
+        <form id="login-form" novalidate>
+            <label class="field">
+                <span>Username</span>
+                <input id="username" type="text" autocomplete="username" required autofocus>
+            </label>
+
+            <label class="field">
+                <span>Password</span>
+                <div class="input-wrap">
+                    <input id="password" type="password" autocomplete="current-password" required>
+                    <button type="button" id="toggle-password" class="link-btn">Show</button>
+                </div>
+            </label>
+
+            <p id="login-error" class="form-error hidden" role="alert"></p>
+
+            <button id="login-submit" class="btn btn-primary btn-block" type="submit">
+                <span class="btn-label">Sign in</span>
+                <span class="spinner" aria-hidden="true"></span>
+            </button>
+        </form>
+    </section>
+</main>
+
+<!-- ============ DASHBOARD ============ -->
+<div id="dashboard-view" class="dashboard hidden">
+    <header class="topbar">
+        <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+        </span>
+            <span class="brand-name">Automation Hub</span>
+        </div>
+        <div class="topbar-right">
+            <div class="user-chip">
+                <span id="user-avatar" class="avatar"></span>
+                <span id="user-name" class="user-name"></span>
+            </div>
+            <button id="logout-btn" class="btn btn-ghost" type="button">Sign out</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <section class="page-head">
+            <h1>Dashboard</h1>
+            <p class="muted">Your scheduled messages at a glance.</p>
+        </section>
+
+        <section id="stats" class="stats"></section>
+
+        <section class="section-head">
+            <h2>Your jobs</h2>
+            <span id="jobs-count" class="count-pill"></span>
+        </section>
+
+        <section id="jobs" class="jobs-grid"></section>
+    </div>
+</div>
+
+<!-- ============ DELETE CONFIRM (native <dialog>) ============ -->
+<dialog id="confirm-dialog" class="dialog">
+    <form method="dialog">
+        <h3>Delete this job?</h3>
+        <p class="muted">
+            <strong id="confirm-name"></strong> and its run history will be removed permanently.
+        </p>
+        <div class="dialog-actions">
+            <button class="btn btn-ghost" value="cancel">Cancel</button>
+            <button class="btn btn-danger" value="confirm">Delete</button>
+        </div>
+    </form>
+</dialog>
+
+<!-- Chhote notifications (toasts) yahan aate hain -->
+<div id="toasts" class="toasts" aria-live="polite"></div>
+
+<script src="/js/app.js" defer></script>
+</body>
+</html>
