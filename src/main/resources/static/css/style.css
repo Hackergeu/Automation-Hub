@@ -1,5 +1,11 @@
+/* =========================================================
+   Automation Hub: poori styling (login, dashboard, form, drawer, dark mode)
+   ========================================================= */
+
 /* ===== Design tokens: rang, shadow, radius ek jagah. Dark mode mein sirf values badalti hain ===== */
 :root {
+  color-scheme: light;
+
   --bg: #f5f6fb;
   --surface: #ffffff;
   --surface-2: #f0f2f9;
@@ -28,29 +34,28 @@
   --ring: 0 0 0 4px rgba(99, 102, 241, .25);
 
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color-scheme: light dark;
 }
 
-/* Computer dark theme mein ho toh apne aap dark */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0a0f1f;
-    --surface: #121a33;
-    --surface-2: #1a2442;
-    --text: #e8ecf8;
-    --muted: #93a0c0;
-    --border: #25305a;
+/* Dark theme: theme.js aur toggle button <html data-theme="dark"> set karte hain */
+:root[data-theme='dark'] {
+  color-scheme: dark; /* time picker, dropdown jaise browser ke apne controls bhi dark ho jayenge */
 
-    --success: #34d399;
-    --success-bg: rgba(16, 185, 129, .16);
-    --warning: #fbbf24;
-    --warning-bg: rgba(245, 158, 11, .16);
-    --danger: #f87171;
-    --danger-bg: rgba(239, 68, 68, .16);
+  --bg: #0a0f1f;
+  --surface: #121a33;
+  --surface-2: #1a2442;
+  --text: #e8ecf8;
+  --muted: #93a0c0;
+  --border: #25305a;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
-    --shadow-md: 0 18px 38px -18px rgba(0, 0, 0, .7);
-  }
+  --success: #34d399;
+  --success-bg: rgba(16, 185, 129, .16);
+  --warning: #fbbf24;
+  --warning-bg: rgba(245, 158, 11, .16);
+  --danger: #f87171;
+  --danger-bg: rgba(239, 68, 68, .16);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-md: 0 18px 38px -18px rgba(0, 0, 0, .7);
 }
 
 /* ===== Base ===== */
@@ -68,6 +73,7 @@ body {
 h1, h2, h3, p { margin: 0; }
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
+.push-right { margin-left: auto; }
 
 /* Peeche ke rangeen blobs */
 .bg {
@@ -110,10 +116,14 @@ h1, h2, h3, p { margin: 0; }
   cursor: pointer;
   transition: transform .15s ease, box-shadow .2s ease, background .2s ease, opacity .2s ease;
 }
-.btn:focus-visible, .switch:focus-visible, .icon-btn:focus-visible, .link-btn:focus-visible { outline: none; box-shadow: var(--ring); }
+.btn:focus-visible,
+.switch:focus-visible,
+.icon-btn:focus-visible,
+.link-btn:focus-visible { outline: none; box-shadow: var(--ring); }
 .btn:active { transform: translateY(1px) scale(.99); }
 .btn:disabled { opacity: .6; cursor: not-allowed; }
 .btn-block { width: 100%; padding: 12px 18px; }
+.btn-sm { padding: 8px 14px; font-size: .88rem; border-radius: 10px; }
 
 .btn-primary {
   color: #fff;
@@ -126,7 +136,16 @@ h1, h2, h3, p { margin: 0; }
 .btn-danger { color: #fff; background: var(--danger); }
 .btn-danger:hover { filter: brightness(1.08); }
 
-.link-btn { border: 0; background: none; color: var(--primary); font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px; padding: 4px 8px; }
+.link-btn {
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
 
 /* Spinner: loading ke waqt button ke andar */
 .spinner {
@@ -140,7 +159,63 @@ h1, h2, h3, p { margin: 0; }
 }
 .btn.is-loading .spinner { display: inline-block; }
 .btn.is-loading .btn-label { opacity: .85; }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Chhote icon buttons (edit, delete, close, refresh, theme) */
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease;
+}
+.icon-btn:hover { color: var(--danger); background: var(--danger-bg); }
+.icon-btn--edit:hover { color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.icon-btn--round { border: 1px solid var(--border); border-radius: 50%; color: var(--text); }
+.icon-btn--round:hover { color: var(--primary); background: var(--surface-2); }
+.is-spinning svg { animation: spin .8s linear infinite; }
+
+/* ===== Forms: input, textarea, dropdown ===== */
+.field { display: grid; gap: 6px; font-size: .88rem; font-weight: 600; }
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.field input:focus,
+.field textarea:focus,
+.field select:focus { outline: none; border-color: var(--primary); box-shadow: var(--ring); }
+.field textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+
+.input-wrap { position: relative; }
+.input-wrap input { padding-right: 70px; }
+.input-wrap .link-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
+
+.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+.field-hint { justify-self: end; font-size: .76rem; font-weight: 500; color: var(--muted); }
+.field-error { font-size: .8rem; font-weight: 500; color: var(--danger); }
+.field-error:empty { display: none; }
+
+.form-error {
+  padding: 10px 12px;
+  font-size: .88rem;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-radius: 10px;
+}
 
 /* ===== Login ===== */
 .login { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
@@ -157,31 +232,6 @@ h1, h2, h3, p { margin: 0; }
 }
 .login-title { font-size: 1.7rem; letter-spacing: -.02em; margin-bottom: 6px; }
 .login-card form { margin-top: 26px; display: grid; gap: 16px; }
-
-.field { display: grid; gap: 6px; font-size: .88rem; font-weight: 600; }
-.field input {
-  width: 100%;
-  padding: 12px 14px;
-  font: inherit;
-  font-weight: 400;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  transition: border-color .2s ease, box-shadow .2s ease;
-}
-.field input:focus { outline: none; border-color: var(--primary); box-shadow: var(--ring); }
-.input-wrap { position: relative; }
-.input-wrap input { padding-right: 70px; }
-.input-wrap .link-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
-
-.form-error {
-  padding: 10px 12px;
-  font-size: .88rem;
-  color: var(--danger);
-  background: var(--danger-bg);
-  border-radius: 10px;
-}
 
 /* ===== Dashboard layout ===== */
 .topbar {
@@ -216,6 +266,7 @@ h1, h2, h3, p { margin: 0; }
 
 .section-head { display: flex; align-items: center; gap: 10px; margin: 36px 0 16px; }
 .section-head h2 { font-size: 1.15rem; }
+.head-actions { display: flex; align-items: center; gap: 8px; }
 .count-pill {
   padding: 2px 10px;
   font-size: .78rem;
@@ -247,6 +298,56 @@ h1, h2, h3, p { margin: 0; }
 }
 .stat-label { font-size: .82rem; font-weight: 600; color: var(--muted); }
 .stat-value { margin-top: 6px; font-size: 2.1rem; font-weight: 700; letter-spacing: -.03em; }
+.stat-sub { margin-top: 2px; font-size: .78rem; color: var(--muted); }
+
+/* Refresh ya search karte waqt cards dobara animate na hon (flicker na ho) */
+.no-anim .stat-card,
+.no-anim .job-card { animation: none; }
+
+/* ===== Search aur filter ===== */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 18px; }
+.search { position: relative; flex: 1 1 240px; max-width: 420px; }
+.search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+.search input {
+  width: 100%;
+  padding: 10px 14px 10px 38px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.search input:focus { outline: none; border-color: var(--primary); box-shadow: var(--ring); }
+
+.segmented {
+  display: inline-flex;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.seg {
+  padding: 6px 14px;
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.seg:focus-visible { outline: none; box-shadow: var(--ring); }
+.seg.is-active { color: var(--text); background: var(--surface); box-shadow: var(--shadow-sm); }
 
 /* ===== Job cards ===== */
 .jobs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
@@ -288,6 +389,7 @@ h1, h2, h3, p { margin: 0; }
   padding-top: 14px;
   border-top: 1px dashed var(--border);
 }
+.job-actions { display: flex; gap: 4px; }
 
 .pill {
   flex-shrink: 0;
@@ -343,20 +445,6 @@ h1, h2, h3, p { margin: 0; }
 .switch[aria-checked='true']::after { transform: translateX(18px); }
 .switch:disabled { opacity: .6; cursor: wait; }
 
-.icon-btn {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 10px;
-  color: var(--muted);
-  background: transparent;
-  cursor: pointer;
-  transition: background .2s ease, color .2s ease;
-}
-.icon-btn:hover { color: var(--danger); background: var(--danger-bg); }
-
 /* ===== Loading skeleton aur empty state ===== */
 .skeleton {
   height: 168px;
@@ -366,7 +454,7 @@ h1, h2, h3, p { margin: 0; }
   border: 1px solid var(--border);
   animation: shimmer 1.3s linear infinite;
 }
-@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.skeleton.skeleton--line { height: 74px; border-radius: 14px; }
 
 .empty {
   grid-column: 1 / -1;
@@ -379,7 +467,7 @@ h1, h2, h3, p { margin: 0; }
 .empty h3 { margin: 12px 0 4px; }
 .empty-icon { font-size: 2.2rem; }
 
-/* ===== Dialog ===== */
+/* ===== Dialogs (delete confirm aur new/edit form) ===== */
 .dialog {
   width: min(420px, calc(100vw - 32px));
   padding: 26px;
@@ -394,77 +482,12 @@ h1, h2, h3, p { margin: 0; }
 .dialog h3 { margin-bottom: 8px; font-size: 1.15rem; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 
-/* ===== Toasts ===== */
-.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: grid; gap: 10px; }
-.toast {
-  min-width: 220px;
-  max-width: 340px;
-  padding: 12px 16px;
-  font-size: .9rem;
-  font-weight: 600;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--success);
-  border-radius: 12px;
-  box-shadow: var(--shadow-md);
-  animation: slide-in .3s ease both;
-}
-.toast--error { border-left-color: var(--danger); }
-.toast.is-leaving { animation: slide-out .25s ease both; }
-
-/* ===== Animations ===== */
-@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-@keyframes pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
-@keyframes slide-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
-@keyframes slide-out { to { opacity: 0; transform: translateX(24px); } }
-
-/* Jinhe animation se dikkat hoti hai (accessibility setting), unke liye band */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-}
-
-/* ===== Mobile ===== */
-@media (max-width: 560px) {
-  .user-name { display: none; }
-  .login-card { padding: 28px 22px; }
-  .jobs-grid { grid-template-columns: 1fr; }
-}
-
-
-/* ===== 8B-2: Job form ===== */
-.btn-sm { padding: 8px 14px; font-size: .88rem; border-radius: 10px; }
-.push-right { margin-left: auto; }
-
 .dialog--wide { width: min(580px, calc(100vw - 24px)); max-height: 92vh; overflow-y: auto; }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .dialog-head h3 { margin: 0; }
-
 #job-form { display: grid; gap: 16px; }
 
-/* textarea aur dropdown ko bhi input jaisa look */
-.field textarea,
-.field select {
-  width: 100%;
-  padding: 12px 14px;
-  font: inherit;
-  font-weight: 400;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  transition: border-color .2s ease, box-shadow .2s ease;
-}
-.field textarea:focus,
-.field select:focus { outline: none; border-color: var(--primary); box-shadow: var(--ring); }
-.field textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
-
-.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
-.field-hint { justify-self: end; font-size: .76rem; font-weight: 500; color: var(--muted); }
-.field-error { font-size: .8rem; font-weight: 500; color: var(--danger); }
-.field-error:empty { display: none; }
-
-/* Schedule box */
+/* ===== Schedule builder (cron) ===== */
 .schedule {
   display: grid;
   gap: 14px;
@@ -514,6 +537,94 @@ h1, h2, h3, p { margin: 0; }
   color: var(--muted);
 }
 
-/* Card ke edit/delete buttons */
-.job-actions { display: flex; gap: 4px; }
-.icon-btn--edit:hover { color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+/* ===== Run history drawer (side se sarakta panel) ===== */
+.drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  width: min(460px, 100vw);
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  padding: 0;
+  color: var(--text);
+  background: var(--surface);
+  border: 0;
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+}
+.drawer[open] { animation: drawer-in .28s ease both; }
+.drawer::backdrop { background: rgba(8, 12, 28, .55); backdrop-filter: blur(3px); }
+
+.drawer-inner { display: flex; flex-direction: column; gap: 16px; height: 100%; padding: 24px; overflow-y: auto; }
+.drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.drawer-head h3 { font-size: 1.2rem; overflow-wrap: anywhere; }
+
+.logs-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.logs-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.log-item {
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  animation: rise .35s ease both;
+}
+.log-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.log-time { font-size: .82rem; font-weight: 600; color: var(--muted); }
+.log-meta { margin-top: 6px; font-size: .82rem; color: var(--muted); }
+.log-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  font-size: .84rem;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.log-empty { padding: 36px 12px; text-align: center; color: var(--muted); }
+
+.badge { padding: 3px 10px; font-size: .74rem; font-weight: 700; border-radius: 999px; }
+.badge--success { color: var(--success); background: var(--success-bg); }
+.badge--failed { color: var(--danger); background: var(--danger-bg); }
+
+/* ===== Toasts ===== */
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: grid; gap: 10px; }
+.toast {
+  min-width: 220px;
+  max-width: 340px;
+  padding: 12px 16px;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--success);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  animation: slide-in .3s ease both;
+}
+.toast--error { border-left-color: var(--danger); }
+.toast.is-leaving { animation: slide-out .25s ease both; }
+
+/* ===== Animations ===== */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes drawer-in { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes slide-out { to { opacity: 0; transform: translateX(24px); } }
+
+/* Jinhe animation se dikkat hoti hai (accessibility setting), unke liye band */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 560px) {
+  .user-name { display: none; }
+  .login-card { padding: 28px 22px; }
+  .jobs-grid { grid-template-columns: 1fr; }
+  .search { max-width: none; }
+  .section-head { flex-wrap: wrap; }
+}

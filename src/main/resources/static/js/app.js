@@ -8,13 +8,24 @@
    ========================================================= */
 
 const STORAGE_KEY = 'automation-hub-session';
+const THEME_KEY = 'automation-hub-theme';
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 const DAY_LABELS = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
 // Dropdown mein isi order mein dikhenge
 const CHANNEL_LABELS = { TELEGRAM: 'Telegram', DISCORD: 'Discord', EMAIL: 'Email' };
 
 // App ki yaaddasht
-const state = { authHeader: null, username: '', jobs: [], channels: [], editingId: null };
+const state = {
+  authHeader: null,
+  username: '',
+  jobs: [],
+  channels: [],
+  stats: null,        // pichhle 24 ghante ka saar (/api/stats)
+  filter: 'all',      // all | active | paused
+  query: '',          // search text
+  editingId: null,
+  logsJobId: null     // drawer mein abhi kaun sa job khula hai
+};
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -28,6 +39,13 @@ const statsEl = $('#stats');
 const jobsEl = $('#jobs');
 const jobsCount = $('#jobs-count');
 const confirmDialog = $('#confirm-dialog');
+const themeBtn = $('#theme-btn');
+const refreshBtn = $('#refresh-btn');
+const searchInput = $('#search');
+const filtersEl = $('#filters');
+const logsDrawer = $('#logs-drawer');
+const logsSummary = $('#logs-summary');
+const logsList = $('#logs-list');
 
 // Form ke elements ek jagah
 const jobDialog = $('#job-dialog');
@@ -57,10 +75,17 @@ function el(tag, className, text) {
 }
 
 // Icons: STATIC (hamare apne likhe) SVG strings. Inme user ka data kabhi nahi aata.
+const svg = (inner, size = 18) =>
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+
 const ICONS = {
-  clock: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
-  trash: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>',
-  pencil: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>'
+  clock: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', 14),
+  trash: svg('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/>'),
+  pencil: svg('<path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/>'),
+  history: svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>'),
+  refresh: svg('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>'),
+  sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  moon: svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>')
 };
 
 function icon(name) {
@@ -100,7 +125,7 @@ async function api(path, options = {}) {
   if (!response.ok) {
     const error = new Error((data && (data.error || Object.values(data)[0])) || 'Request failed');
     error.status = response.status;
-    error.body = data; // jaise { "channel": "DISCORD is not configured..." }
+    error.body = data;
     throw error;
   }
   return data;
@@ -126,13 +151,64 @@ function showToast(message, type = 'success') {
   }, 3200);
 }
 
-/* ---------- Cron <-> insaani bhasha ---------- */
+/* ---------- Theme (light / dark) ---------- */
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+// Button mein wahi icon jo "agla" mode dikhaye: dark hai toh sun, light hai toh moon
+function updateThemeButton() {
+  const dark = currentTheme() === 'dark';
+  themeBtn.replaceChildren(icon(dark ? 'sun' : 'moon'));
+  themeBtn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
+}
+
+themeBtn.addEventListener('click', () => {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* storage band ho toh ignore */ }
+  updateThemeButton();
+});
+
+// User ne kabhi manually nahi chuna ho toh computer ki theme badalne par saath badlo
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (event) => {
+  try { if (localStorage.getItem(THEME_KEY)) return; } catch (e) { /* ignore */ }
+  document.documentElement.dataset.theme = event.matches ? 'dark' : 'light';
+  updateThemeButton();
+});
+
+/* ---------- Time helpers ---------- */
 
 function formatTime(hour, minute) {
   const suffix = hour >= 12 ? 'PM' : 'AM';
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
   return `${hour12}:${pad2(minute)} ${suffix}`;
 }
+
+// Server "2026-11-01T14:17:43.123456" bhejta hai (timezone ke bina). Browser ise local time maanta hai.
+// Microseconds (6 digits) ko 3 tak chhota karte hain, taaki saare browsers parse kar saken.
+function parseServerTime(value) {
+  return value ? new Date(value.replace(/(\.\d{3})\d+/, '$1')) : null;
+}
+
+function timeAgo(date) {
+  const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+  if (seconds < 45) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}
+
+function formatDuration(start, end) {
+  if (!start || !end) return '';
+  const ms = Math.max(0, end.getTime() - start.getTime());
+  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+/* ---------- Cron <-> insaani bhasha ---------- */
 
 // "0 0 8 * * *" -> "Every day at 8:00 AM". Samajh na aaye toh raw cron dikha dete hain
 function cronToText(cron) {
@@ -187,6 +263,22 @@ function parseCron(cron) {
 
 /* ---------- Rendering ---------- */
 
+// Success rate card. Math.floor: 99.6% ko "100%" dikhana jhootha hoga jab failures hue hon
+function successCard() {
+  const s = state.stats;
+  if (!s || s.runsLast24h === 0) {
+    return { label: 'Success rate (24h)', value: '—', sub: 'No runs yet', tone: 'var(--muted)' };
+  }
+  const rate = Math.floor((s.successLast24h / s.runsLast24h) * 100);
+  const tone = rate >= 95 ? 'var(--success)' : rate >= 70 ? 'var(--warning)' : 'var(--danger)';
+  return {
+    label: 'Success rate (24h)',
+    value: `${rate}%`,
+    sub: `${s.successLast24h} of ${s.runsLast24h} runs`,
+    tone
+  };
+}
+
 function renderStats() {
   const total = state.jobs.length;
   const active = state.jobs.filter((j) => j.active).length;
@@ -194,7 +286,8 @@ function renderStats() {
   const cards = [
     { label: 'Total jobs', value: total, tone: 'var(--primary)' },
     { label: 'Active', value: active, tone: 'var(--success)' },
-    { label: 'Paused', value: total - active, tone: 'var(--warning)' }
+    { label: 'Paused', value: total - active, tone: 'var(--warning)' },
+    successCard()
   ];
 
   statsEl.replaceChildren(...cards.map((card, index) => {
@@ -202,8 +295,20 @@ function renderStats() {
     node.style.setProperty('--i', index);
     node.style.setProperty('--tone', card.tone);
     node.append(el('div', 'stat-label', card.label), el('div', 'stat-value', String(card.value)));
+    if (card.sub) node.append(el('div', 'stat-sub', card.sub));
     return node;
   }));
+}
+
+// Search aur filter ke hisaab se jo jobs dikhane hain
+function visibleJobs() {
+  const query = state.query.trim().toLowerCase();
+  return state.jobs.filter((job) => {
+    if (state.filter === 'active' && !job.active) return false;
+    if (state.filter === 'paused' && job.active) return false;
+    if (!query) return true;
+    return job.name.toLowerCase().includes(query) || job.message.toLowerCase().includes(query);
+  });
 }
 
 function createJobCard(job, index) {
@@ -230,7 +335,7 @@ function createJobCard(job, index) {
   const meta = el('div', 'job-meta');
   meta.append(channelChip, scheduleChip);
 
-  // Neeche: switch (pause/resume), aur edit + delete buttons
+  // Neeche: switch (pause/resume), aur history + edit + delete buttons
   const toggle = el('button', 'switch');
   toggle.type = 'button';
   toggle.setAttribute('role', 'switch');
@@ -241,20 +346,29 @@ function createJobCard(job, index) {
   const switchRow = el('div', 'switch-row');
   switchRow.append(toggle, el('span', '', job.active ? 'Running' : 'Paused'));
 
+  const historyBtn = el('button', 'icon-btn icon-btn--edit');
+  historyBtn.type = 'button';
+  historyBtn.title = 'Run history';
+  historyBtn.setAttribute('aria-label', `View run history of ${job.name}`);
+  historyBtn.append(icon('history'));
+  historyBtn.addEventListener('click', () => openLogs(job));
+
   const editBtn = el('button', 'icon-btn icon-btn--edit');
   editBtn.type = 'button';
+  editBtn.title = 'Edit';
   editBtn.setAttribute('aria-label', `Edit ${job.name}`);
   editBtn.append(icon('pencil'));
   editBtn.addEventListener('click', () => openJobForm(job));
 
   const deleteBtn = el('button', 'icon-btn');
   deleteBtn.type = 'button';
+  deleteBtn.title = 'Delete';
   deleteBtn.setAttribute('aria-label', `Delete ${job.name}`);
   deleteBtn.append(icon('trash'));
   deleteBtn.addEventListener('click', () => deleteJob(job));
 
   const actions = el('div', 'job-actions');
-  actions.append(editBtn, deleteBtn);
+  actions.append(historyBtn, editBtn, deleteBtn);
 
   const foot = el('div', 'job-foot');
   foot.append(switchRow, actions);
@@ -264,9 +378,11 @@ function createJobCard(job, index) {
 }
 
 function renderJobs() {
-  jobsCount.textContent = String(state.jobs.length);
+  const visible = visibleJobs();
+  const total = state.jobs.length;
+  jobsCount.textContent = visible.length === total ? String(total) : `${visible.length} of ${total}`;
 
-  if (state.jobs.length === 0) {
+  if (total === 0) {
     const empty = el('div', 'empty');
     empty.append(
       el('div', 'empty-icon', '📭'),
@@ -276,12 +392,36 @@ function renderJobs() {
     jobsEl.replaceChildren(empty);
     return;
   }
-  jobsEl.replaceChildren(...state.jobs.map(createJobCard));
+
+  if (visible.length === 0) {
+    const empty = el('div', 'empty');
+    empty.append(
+      el('div', 'empty-icon', '🔍'),
+      el('h3', '', 'No matching jobs'),
+      el('p', 'muted', 'Try a different search or filter.')
+    );
+    jobsEl.replaceChildren(empty);
+    return;
+  }
+
+  jobsEl.replaceChildren(...visible.map(createJobCard));
+}
+
+// Pehli baar cards animate hote hain. Uske baad (refresh/search) nahi, warna har baar flicker hota
+let animationsSettled = false;
+function settleAnimations() {
+  if (animationsSettled) return;
+  animationsSettled = true;
+  setTimeout(() => {
+    statsEl.classList.add('no-anim');
+    jobsEl.classList.add('no-anim');
+  }, 900);
 }
 
 function render() {
   renderStats();
   renderJobs();
+  settleAnimations();
 }
 
 function showSkeletons() {
@@ -305,6 +445,86 @@ async function loadChannels() {
     state.channels = ['TELEGRAM'];
   }
 }
+
+// Pichhle 24 ghante ka saar. Na mile toh stat card "—" dikhayega, dashboard nahi tootega
+async function loadStats() {
+  try {
+    state.stats = await api('/api/stats');
+  } catch (error) {
+    if (error.status === 401) throw error;
+    state.stats = null;
+  }
+  renderStats();
+}
+
+const refreshAll = () => Promise.all([loadJobs(), loadStats()]);
+
+refreshBtn.append(icon('refresh'));
+refreshBtn.addEventListener('click', async () => {
+  refreshBtn.classList.add('is-spinning');
+  try {
+    await refreshAll();
+  } catch (error) {
+    handleError(error);
+  } finally {
+    refreshBtn.classList.remove('is-spinning');
+  }
+});
+
+// Har 30 second mein khud refresh (tab dikh raha ho aur koi dialog khula na ho tabhi)
+setInterval(() => {
+  if (!state.authHeader || document.hidden || document.querySelector('dialog[open]')) return;
+  refreshAll().catch((error) => { if (error.status === 401) handleError(error); });
+}, 30000);
+
+/* ---------- Search, filter, keyboard shortcuts ---------- */
+
+searchInput.addEventListener('input', () => {
+  state.query = searchInput.value;
+  renderJobs();
+});
+
+searchInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    searchInput.value = '';
+    state.query = '';
+    renderJobs();
+    searchInput.blur();
+  }
+});
+
+function setFilter(value) {
+  state.filter = value;
+  filtersEl.querySelectorAll('[data-filter]').forEach((button) => {
+    const on = button.dataset.filter === value;
+    button.classList.toggle('is-active', on);
+    button.setAttribute('aria-pressed', String(on));
+  });
+}
+
+filtersEl.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-filter]');
+  if (!button) return;
+  setFilter(button.dataset.filter);
+  renderJobs();
+});
+
+// "/" = search par jao, "n" = naya job. Typing ke beech ya dialog khula ho toh kuch nahi
+document.addEventListener('keydown', (event) => {
+  if (!state.authHeader || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (document.querySelector('dialog[open]')) return;
+
+  const tag = (event.target.tagName || '').toLowerCase();
+  if (['input', 'textarea', 'select'].includes(tag) || event.target.isContentEditable) return;
+
+  if (event.key === '/') {
+    event.preventDefault();
+    searchInput.focus();
+  } else if (event.key.toLowerCase() === 'n') {
+    event.preventDefault();
+    openJobForm();
+  }
+});
 
 /* ---------- Pause / resume / delete ---------- */
 
@@ -338,11 +558,81 @@ async function deleteJob(job) {
     await api(`/api/jobs/${job.id}`, { method: 'DELETE' });
     state.jobs = state.jobs.filter((j) => j.id !== job.id);
     render();
+    loadStats().catch(() => {}); // job ke logs bhi gaye, isliye stats badal sakte hain
     showToast(`"${job.name}" deleted`);
   } catch (error) {
     handleError(error);
   }
 }
+
+/* =========================================================
+   RUN HISTORY DRAWER
+   ========================================================= */
+
+function createLogItem(log) {
+  const started = parseServerTime(log.startedAt);
+  const finished = parseServerTime(log.finishedAt);
+  const ok = log.status === 'SUCCESS';
+
+  const item = el('li', 'log-item');
+
+  const top = el('div', 'log-top');
+  const time = el('span', 'log-time', started ? timeAgo(started) : '');
+  time.title = started ? started.toLocaleString() : ''; // hover par poori date-time
+  top.append(el('span', ok ? 'badge badge--success' : 'badge badge--failed', ok ? 'SUCCESS' : 'FAILED'), time);
+
+  const parts = [`${log.attempts} attempt${log.attempts === 1 ? '' : 's'}`];
+  const duration = formatDuration(started, finished);
+  if (duration) parts.push(`took ${duration}`);
+
+  item.append(top, el('div', 'log-meta', parts.join(' · ')));
+  if (log.errorMessage) item.append(el('p', 'log-error', log.errorMessage));
+  return item;
+}
+
+function renderLogs(logs) {
+  const succeeded = logs.filter((l) => l.status === 'SUCCESS').length;
+
+  logsSummary.replaceChildren(
+    el('span', 'badge badge--success', `${succeeded} succeeded`),
+    el('span', 'badge badge--failed', `${logs.length - succeeded} failed`),
+    el('span', 'muted', 'latest 50 runs')
+  );
+
+  if (logs.length === 0) {
+    logsList.replaceChildren(el('li', 'log-empty', 'No runs yet. This job has not fired so far.'));
+    return;
+  }
+  logsList.replaceChildren(...logs.map(createLogItem));
+}
+
+async function openLogs(job) {
+  state.logsJobId = job.id;
+  $('#logs-title').textContent = job.name;
+  $('#logs-subtitle').textContent =
+    `${CHANNEL_LABELS[job.channel] || job.channel} · ${cronToText(job.cronExpression)}`;
+
+  logsSummary.replaceChildren();
+  logsList.replaceChildren(...Array.from({ length: 4 }, () => el('li', 'skeleton skeleton--line')));
+  logsDrawer.showModal();
+
+  try {
+    const logs = await api(`/api/jobs/${job.id}/logs`);
+    if (state.logsJobId !== job.id) return; // beech mein doosra job khul gaya, purana jawab ignore
+    renderLogs(logs);
+  } catch (error) {
+    if (error.status === 401) {
+      logsDrawer.close();
+      handleError(error);
+    } else {
+      logsList.replaceChildren(el('li', 'log-empty', 'Could not load run history.'));
+    }
+  }
+}
+
+$('#logs-close').addEventListener('click', () => logsDrawer.close());
+// Drawer ke bahar (dhundhle backdrop par) click karne se band
+logsDrawer.addEventListener('click', (event) => { if (event.target === logsDrawer) logsDrawer.close(); });
 
 /* =========================================================
    NEW / EDIT FORM + CRON BUILDER
@@ -592,7 +882,19 @@ function logout(message) {
   state.username = '';
   state.jobs = [];
   state.channels = [];
+  state.stats = null;
+  state.query = '';
+  state.logsJobId = null;
+  searchInput.value = '';
+  setFilter('all');
   if (jobDialog.open) jobDialog.close();
+  if (logsDrawer.open) logsDrawer.close();
+
+  // Agle login par cards phir se animate hon
+  animationsSettled = false;
+  statsEl.classList.remove('no-anim');
+  jobsEl.classList.remove('no-anim');
+
   loginForm.reset();
   showLogin(message);
 }
@@ -618,7 +920,7 @@ loginForm.addEventListener('submit', async (event) => {
 
   try {
     // Ye data load hi login ki jaanch hai: 200 = sahi, 401 = galat
-    await Promise.all([loadJobs(), loadChannels()]);
+    await Promise.all([loadJobs(), loadChannels(), loadStats()]);
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ auth: state.authHeader, user: username }));
     showDashboardShell();
   } catch (error) {
@@ -640,8 +942,11 @@ $('#toggle-password').addEventListener('click', (event) => {
 
 $('#logout-btn').addEventListener('click', () => logout());
 
-/* ---------- Start: pehle se login hai toh seedha dashboard ---------- */
+/* ---------- Start ---------- */
 
+updateThemeButton();
+
+// Pehle se login hai (sessionStorage mein) toh seedha dashboard
 (async function boot() {
   const saved = sessionStorage.getItem(STORAGE_KEY);
   if (!saved) return; // login screen waise hi dikh rahi hai
@@ -652,7 +957,7 @@ $('#logout-btn').addEventListener('click', () => logout());
     state.username = user;
     showDashboardShell();
     showSkeletons();
-    await Promise.all([loadJobs(), loadChannels()]);
+    await Promise.all([loadJobs(), loadChannels(), loadStats()]);
   } catch (error) {
     logout(error.status === 401 ? 'Your session has expired. Please sign in again.' : undefined);
   }
